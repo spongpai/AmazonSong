@@ -306,18 +306,26 @@ public class MusicLookup {
         String title = null;
         Boolean found = false;
         /* The helper can sign requests in two forms - map form and string form */
-        String fileID = "ASINforDetails_0922";
+        //String fileID = "ASINforDetails_0922";
+        String fileID = "song_1001";
+        boolean hasASIN = false;
+        
         //String searchIndex = "Music";
         String searchIndex = "MP3Downloads";
         //String searchIndex = "both";
         String fileName = "data/"+fileID+".csv";
-        String hitFile = "data/"+fileID+"_asin_"+searchIndex+".csv";
-        String missFile = "data/"+fileID+"_miss_"+searchIndex+".csv";
-        String albumFile = "data/"+fileID+"_album_"+searchIndex+".csv";
+        String hitFile = "data/result/"+fileID+"_asin_"+searchIndex+".csv";
+        String missFile = "data/result/"+fileID+"_miss_"+searchIndex+".csv";
+        String albumFile = "data/result"+fileID+"_album_"+searchIndex+".csv";
         //String simFile = "data/"+fileID+"_sim_"+searchIndex+".csv";
         MusicLookup ml = new MusicLookup();
-        //ml.getMusicFromFile(fileName);
-        ml.getASINFromFile(fileName);
+        
+        if(!hasASIN){
+        	ml.getMusicFromFile(fileName);		// NO ASIN in the file yet
+        } else{
+        	ml.getASINFromFile(fileName);		// ASIN is already included in the file
+        }
+        
         int hit = 0;
         int miss = 0;
         int start = 0;
@@ -334,58 +342,87 @@ public class MusicLookup {
         StringBuilder sbFound = new StringBuilder();
         StringBuilder sbMiss = new StringBuilder();
         StringBuilder sbAlbum = new StringBuilder();
-        // Write output to files
-        ml.writeToFile(hitFile, "key|" + Music.getMusicHeader() + "|sim1|sim2|sim3|requestUrl\n" + sbFound.toString(), true);
-        ml.writeToFile(albumFile, "key|fileid|" + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
+        // Write header of the output files
+        ml.writeToFile(hitFile, "key"+Utils.split+ Music.getMusicHeader() + Utils.split + "sim1"+Utils.split+"sim2"+Utils.split+"sim3"+Utils.split+"requestUrl\n" + sbFound.toString(), true);
+        ml.writeToFile(albumFile, "key"+Utils.split+"fileid"+Utils.split + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
         ml.writeToFile(missFile, Music.getMusicHeader() + "requestUrl\n" + sbMiss.toString(), true);
-        for(int i = start; i < stop; i++){
-        	//System.out.println(ml.musicList.get(i).toString());
-        	Music music = ml.musicList.get(i);
-        	
-        	// search by song name and artist
-        	//params.put("Keywords", music.song + " " + music.artist);
-            
-        	// serach by ASIN
-        	String key = music.ASIN;
-        	params.put("Keywords", music.ASIN);
-        	
-        	//params.put("Power", "keywords:"+music.song);
-        	// Try on "MP3Downloads" index
-            params.put("SearchIndex", searchIndex);
-            requestUrl = helper.sign(params);
-            System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
-            found = ml.fetchItem(requestUrl, music);
-            
-            if(found){
-            	hit++;
-            	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
-            	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
-            	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
-            	if(music.totalReviews > 0){
-            		System.out.println("----- found reviews -----" + music.toString() + "|" + sim1 + "|" + sim2 + "|" + sim3);
-            	}
-            	//sbFound.append(key + "|" + music.toString() + "|" + sim1 + "|" + sim2 + "|" + sim3 + "|" + requestUrl + "\n");
-            	//sbAlbum.append(key + "|" + music.fileid + "|" + music.album.toString() + "\n");
+        if(!hasASIN){
+        	for(int i = start; i < stop; i++){
+            	//System.out.println(ml.musicList.get(i).toString());
+            	Music music = ml.musicList.get(i);
             	
-            	ml.writeToFile(hitFile, key + "|" + music.toString() + "|" + sim1 + "|" + sim2 + "|" + sim3 + "|" + requestUrl + "\n", true);
-            	if(music.album != null)
-            		ml.writeToFile(albumFile, key + "|" + music.fileid + "|" + music.album.toString() + "\n", true);
-            	
-            } else{
-            	ml.writeToFile(missFile, music.toString() + "|" + requestUrl + "\n", true);
-            	//sbMiss.append(music.toString() + "|" + requestUrl + "\n");
-            	miss++;
+            	// search by song name and artist
+            	params.put("Keywords", music.song + " " + music.artist);
+                
+            	// Try on "MP3Downloads" index
+                params.put("SearchIndex", searchIndex);
+                requestUrl = helper.sign(params);
+                System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+                found = ml.fetchItem(requestUrl, music);
+                
+                if(found){
+                	hit++;
+                	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	if(music.totalReviews > 0){
+                		System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
+                	}
+                	
+                	ml.writeToFile(hitFile, music.ASIN + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + Utils.split + requestUrl + "\n", true);
+                	if(music.album != null)
+                		ml.writeToFile(albumFile, music.ASIN + Utils.split + music.fileid + Utils.split + music.album.toString() + "\n", true);
+                	
+                } else{
+                	ml.writeToFile(missFile, music.toString() + Utils.split + requestUrl + "\n", true);
+                	miss++;
+                }
+                try {
+    				Thread.sleep(800);
+    			} catch (InterruptedException e) {
+    				e.printStackTrace();
+    				continue;
+    			}
             }
-            
-            
-            try {
-				Thread.sleep(800);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-				continue;
-			}
+        } else{
+        	for(int i = start; i < stop; i++){
+            	//System.out.println(ml.musicList.get(i).toString());
+            	Music music = ml.musicList.get(i);
+            	
+            	// serach by ASIN
+            	String key = music.ASIN;
+            	params.put("Keywords", music.ASIN);
+            	
+            	// Try on "MP3Downloads" index
+                params.put("SearchIndex", searchIndex);
+                requestUrl = helper.sign(params);
+                System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+                found = ml.fetchItem(requestUrl, music);
+                
+                if(found){
+                	hit++;
+                	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	if(music.totalReviews > 0){
+                		System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
+                	}
+                	ml.writeToFile(hitFile, key + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + Utils.split + requestUrl + "\n", true);
+                	if(music.album != null)
+                		ml.writeToFile(albumFile, key + Utils.split + music.fileid + Utils.split + music.album.toString() + "\n", true);
+                	
+                } else{
+                	ml.writeToFile(missFile, music.toString() + Utils.split + requestUrl + "\n", true);
+                	miss++;
+                }try {
+    				Thread.sleep(800);
+    			} catch (InterruptedException e) {
+    				e.printStackTrace();
+    				continue;
+    			}
+            }
         }
+        
         
          
         System.out.println("hit: " + hit + ", miss: " + miss);

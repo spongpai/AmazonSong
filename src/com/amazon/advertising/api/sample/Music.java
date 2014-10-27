@@ -55,9 +55,13 @@ public class Music extends Product {
 		this.totalReviews = total;
 	}
 	public static String getMusicHeader(){
-		return "fileid|datesaved|posttitle|artist|song|ASIN|Note|" +
-				"amz_artist|amz_song_title|duration|label|genre|sale_rank|" +
-				"total_reviews|5stars|4stars|3stars|2stars|1star|avgRage|detail_page_url";
+		return "fileid" + Utils.split + "datesaved" + Utils.split + "posttitle" + Utils.split + 
+				"artist" + Utils.split + "song" + Utils.split + "ASIN" + Utils.split + 
+				"Note" + Utils.split + "amz_artist" + Utils.split + "amz_song_title" + Utils.split + 
+				"duration" + Utils.split + "label" + Utils.split + "genre" + Utils.split + 
+				"sale_rank" + Utils.split + "total_reviews" + Utils.split + "5stars" + Utils.split + 
+				"4stars" + Utils.split + "3stars" + Utils.split + "2stars" + Utils.split +
+				"1star" + Utils.split + "avgRage" + Utils.split + "detail_page_url";
 		
 //		return "fileid|datesaved|posttitle|artist|song|ASIN|Note|" +
 //				"amz_title|amz_artist|amz_creator|amz_manufacturer|productgroup|" +
@@ -72,25 +76,26 @@ public class Music extends Product {
 	}
 	
 	public String toString(){
-		String output = this.fileid + "|" + this.date + "|" + this.postTitle + "|" + this.artist + "|" + this.song;
+		String output = this.fileid + Utils.split + this.date + Utils.split + this.postTitle + Utils.split + this.artist + Utils.split + this.song;
 		if(this.ASIN != null)
-			output += "|" + this.ASIN + "|" + this.note;
+			output += Utils.split + this.ASIN + Utils.split + this.note;
 		else
-			output += "| |" + this.note;
+			output += Utils.split + " " + Utils.split + this.note;
 		
-		output += "|" + this.amzArtist +
-					"|" + this.amzSongTitle +
-					"|" + this.duration + "|" + this.label + "|" + this.genre + "|" + this.saleRank;
+		output += Utils.split + this.amzArtist +
+					Utils.split + this.amzSongTitle +
+					Utils.split + this.duration + Utils.split + this.label + Utils.split + this.genre + Utils.split + this.saleRank;
 		
 		if(this.disReviews != null){
-			output += "|" + this.totalReviews 
-					+ "|" + this.disReviews[4] + "|" + this.disReviews[3] + "|" + this.disReviews[2] + "|" + this.disReviews[1] + "|" + this.disReviews[0]
-					+ "|" + this.avgRate;
+			output += Utils.split + this.totalReviews 
+					+ Utils.split + this.disReviews[4] + Utils.split + this.disReviews[3] + Utils.split + this.disReviews[2] 
+					+ Utils.split + this.disReviews[1] + Utils.split + this.disReviews[0]
+					+ Utils.split + this.avgRate;
 		} else{
-			output += "|0|0|0|0|0|0|0";
+			output += Utils.split + "0" + Utils.split + "0" + Utils.split + "0" + Utils.split + "0" + Utils.split + "0" + Utils.split + "0" + Utils.split + "0";
 		}
 		
-		output += "|" + this.detailPage;
+		output += Utils.split + this.detailPage;
 		
 		/*
 		if(!this.amzItemAttributes.isEmpty()){

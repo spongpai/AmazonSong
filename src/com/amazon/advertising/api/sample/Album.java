@@ -58,18 +58,28 @@ public class Album extends Product{
 	}
 	
 	public static String getAlbumHeader(){
-		return "Album_ASIN|artist|album_name|duration|label|genre|sale_rank|total_reviews|5stars|4stars|3stars|2stars|1star|detail_page_url";
+		return "Album_ASIN" + Utils.split + "artist" + Utils.split + 
+				"album_name" + Utils.split + "duration" + Utils.split + 
+				"label" + Utils.split + "genre" + Utils.split + 
+				"sale_rank" + Utils.split + "total_reviews" + Utils.split + 
+				"5stars" + Utils.split + "4stars" + Utils.split + 
+				"3stars" + Utils.split + "2stars" + Utils.split + 
+				"1star" + Utils.split + "detail_page_url";
 	}
 	public String toString(){
-		String output = this.ASIN + "|" + this.artist + "|" + this.albumName + "|" + this.duration + "|" + this.label + "|" + this.genre + "|" + this.saleRank;
+		String output = this.ASIN + Utils.split + this.artist + Utils.split + this.albumName + Utils.split + 
+				this.duration + Utils.split + this.label + Utils.split + this.genre + Utils.split + this.saleRank;
 		
 		if(this.disReviews != null){
-			output += "|" + this.totalReviews 
-					+ "|" + this.disReviews[4] + "|" + this.disReviews[3] + "|" + this.disReviews[2] + "|" + this.disReviews[1] + "|" + this.disReviews[0];
+			output += Utils.split + this.totalReviews 
+					+ Utils.split + this.disReviews[4] + Utils.split + this.disReviews[3] 
+					+ Utils.split + this.disReviews[2] + Utils.split + this.disReviews[1] 
+					+ Utils.split + this.disReviews[0];
 		} else{
-			output += "|0|0|0|0|0|0";
+			output += Utils.split + "0" + Utils.split + "0" + Utils.split + "0" + Utils.split + 
+					"0" + Utils.split + "0" + Utils.split + "0";
 		}
-		output += "|" + this.detailPage;
+		output += Utils.split + this.detailPage;
 		return output;
 	}
 	
