@@ -25,7 +25,8 @@ import org.w3c.dom.NodeList;
 
 public class MusicLookup {
 	ArrayList<Music> musicList = new ArrayList<Music>();
-	
+	String fileID;
+	int songID;
 	 /*
      * Your AWS Access Key ID, as taken from the AWS Your Account page.
      */
@@ -79,6 +80,7 @@ public class MusicLookup {
 			br.close();
 	    	br = null;
 	    } catch (Exception e){
+	    	System.out.println("Error in getASINFromFile");
 	    	e.printStackTrace();
 	    } 
 	}
@@ -157,6 +159,8 @@ public class MusicLookup {
             	System.out.println(errorNode.getTextContent());
             }
         } catch (Exception e) {
+        	this.writeToFile("error/exception" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+            
             throw new RuntimeException(e);
         }
         return found;
@@ -188,7 +192,10 @@ public class MusicLookup {
     		}
     		
     	} catch (Exception e){
-    		
+    		this.writeToFile("error/exception_" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+            
+    		System.out.println("Error in SetMusicDetails");
+    		e.printStackTrace();
     	}
     	
     }
@@ -254,6 +261,9 @@ public class MusicLookup {
 			this.setItemDetail(doc, al);
 			m.album = al;
 		} catch (IOException e) {
+			this.writeToFile("error/exception_" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+            
+			System.out.println("Error in setMusicAlbum");
 			e.printStackTrace();
 		}
     }
@@ -308,18 +318,19 @@ public class MusicLookup {
         /* The helper can sign requests in two forms - map form and string form */
         //String fileID = "ASINforDetails_0922";
         String fileID = "song_1001";
+        Long timeStamp = System.currentTimeMillis();
         boolean hasASIN = false;
         
         //String searchIndex = "Music";
         String searchIndex = "MP3Downloads";
         //String searchIndex = "both";
         String fileName = "data/"+fileID+".csv";
-        String hitFile = "data/result/"+fileID+"_asin_"+searchIndex+".csv";
-        String missFile = "data/result/"+fileID+"_miss_"+searchIndex+".csv";
-        String albumFile = "data/result"+fileID+"_album_"+searchIndex+".csv";
+        String hitFile = "data/result/"+fileID+"_asin_"+searchIndex+timeStamp+".csv";
+        String missFile = "data/result/"+fileID+"_miss_"+searchIndex+timeStamp+".csv";
+        String albumFile = "data/result"+fileID+"_album_"+searchIndex+timeStamp+".csv";
         //String simFile = "data/"+fileID+"_sim_"+searchIndex+".csv";
         MusicLookup ml = new MusicLookup();
-        
+        ml.fileID = fileID;
         if(!hasASIN){
         	ml.getMusicFromFile(fileName);		// NO ASIN in the file yet
         } else{
@@ -358,6 +369,7 @@ public class MusicLookup {
                 params.put("SearchIndex", searchIndex);
                 requestUrl = helper.sign(params);
                 System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+                ml.songID = i;
                 found = ml.fetchItem(requestUrl, music);
                 
                 if(found){
@@ -397,7 +409,8 @@ public class MusicLookup {
                 params.put("SearchIndex", searchIndex);
                 requestUrl = helper.sign(params);
                 System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
-                found = ml.fetchItem(requestUrl, music);
+                ml.songID = i;
+                found = ml.fetchItem( requestUrl, music);
                 
                 if(found){
                 	hit++;
@@ -417,6 +430,7 @@ public class MusicLookup {
                 }try {
     				Thread.sleep(800);
     			} catch (InterruptedException e) {
+    				System.out.println("Interrupt ----------------------------------------------");
     				e.printStackTrace();
     				continue;
     			}
