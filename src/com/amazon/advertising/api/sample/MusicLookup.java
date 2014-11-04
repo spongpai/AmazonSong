@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,6 +14,11 @@ import java.util.Map;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 import org.apache.lucene.search.spell.JaroWinklerDistance;
 import org.apache.lucene.search.spell.LevensteinDistance;
@@ -27,6 +33,7 @@ public class MusicLookup {
 	ArrayList<Music> musicList = new ArrayList<Music>();
 	String fileID;
 	int songID;
+	String songURL, albumURL;
 	 /*
      * Your AWS Access Key ID, as taken from the AWS Your Account page.
      */
@@ -57,7 +64,20 @@ public class MusicLookup {
 	public void MusicLookup(){
 		
 	}
-	
+	public void setSongURL(String url){
+		songURL = url;
+	}
+	public void setAlbumURL(String url){
+		albumURL = url;
+	}
+	public void sleep(int ms){
+		try {
+			Thread.sleep(ms);
+		} catch (InterruptedException e) {
+			System.out.println("Interrupt ----------------------------------------------");
+			e.printStackTrace();
+		}
+	}
 	public void getASINFromFile(String file){
 		String line = null;
 		BufferedReader br = null;
@@ -116,6 +136,49 @@ public class MusicLookup {
 			e.printStackTrace();
 		}
 	}
+	
+	/*
+     * Utility function to fetch the response from the service and extract the
+     * title from the XML.
+     */
+    private boolean fetchISBN(String requestUrl, Music music) {
+        Boolean found = false;
+        music.itemLinks.put("requestUrl", requestUrl);
+        try {
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(requestUrl);
+            Node asinNode = doc.getElementsByTagName("ASIN").item(0);
+            if(asinNode != null){
+            	found = true;
+            	music.setASIN(asinNode.getTextContent());
+            }
+            else{
+            	Node errorNode = doc.getElementsByTagName("Errors").item(0);
+            	System.out.println(errorNode.getTextContent());
+            	this.writeToFile("error/exception" + fileID, "[" + songID + "] " + errorNode.getTextContent() + "\n", true);
+                
+            }
+        } catch (Exception e) {
+        	this.writeToFile("error/exception" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+            
+            throw new RuntimeException(e);
+        }
+        return found;
+    }
+    
+    private void printDom(Document doc){
+    	try {
+	    	TransformerFactory tFactory = TransformerFactory.newInstance();
+	    	Transformer transformer = tFactory.newTransformer();
+	    	DOMSource source = new DOMSource(doc);
+	    	StreamResult result = new StreamResult(System.out);
+			transformer.transform(source, result);
+		} catch (TransformerException e) {
+			e.printStackTrace();
+		}
+    }
+    
 	/*
      * Utility function to fetch the response from the service and extract the
      * title from the XML.
@@ -126,7 +189,11 @@ public class MusicLookup {
         try {
             DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
             DocumentBuilder db = dbf.newDocumentBuilder();
-            Document doc = db.parse(requestUrl);
+            Document doc = db.parse(new URL(requestUrl).openStream());
+            
+            System.out.println("------\n");
+            printDom(doc);
+            System.out.println("\n------\n");
             Node asinNode = doc.getElementsByTagName("ASIN").item(0);
             if(asinNode != null){
             	found = true;
@@ -138,6 +205,7 @@ public class MusicLookup {
             	}
             	Node detailPage = doc.getElementsByTagName("DetailPageURL").item(0);
             	music.detailPage = detailPage.getTextContent();
+            	this.setSongURL(music.detailPage);
             	this.setMusicDetails(music.detailPage, music);
             	
             	/*
@@ -157,6 +225,8 @@ public class MusicLookup {
             else{
             	Node errorNode = doc.getElementsByTagName("Errors").item(0);
             	System.out.println(errorNode.getTextContent());
+            	this.writeToFile("error/exception" + fileID, "[" + songID + "] " + errorNode.getTextContent() + "\n", true);
+                
             }
         } catch (Exception e) {
         	this.writeToFile("error/exception" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
@@ -168,6 +238,7 @@ public class MusicLookup {
     public void setMusicDetails(String productUrl, Music music){
     	org.jsoup.nodes.Document doc;
 		try {
+			this.sleep(3000);
 			doc = Jsoup.connect(productUrl).get();
     		setItemDetail(doc, music);
     		
@@ -188,17 +259,20 @@ public class MusicLookup {
     		String albumName = album.text();
     		String albumUrl = album.attr("href");
     		if(albumUrl != null){
+    			this.sleep(3000);
+    			this.setAlbumURL(albumUrl);
     			setMusicAlbum(artistName, albumName, albumUrl, music);
     		}
     		
     	} catch (Exception e){
-    		this.writeToFile("error/exception_" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+    		this.writeToFile("error/exception_" + fileID, "[" + songID + "] setMusicDetails" + e.getMessage() + "\n", true);
             
     		System.out.println("Error in SetMusicDetails");
     		e.printStackTrace();
     	}
     	
     }
+    
     public void setItemDetail(org.jsoup.nodes.Document doc, Product p){
     	Element product = doc.getElementById("productDetailsTable");
 		//pageUrl|duration|label|genre|sale_rank
@@ -257,11 +331,12 @@ public class MusicLookup {
     	Album al = new Album(artist, albumName, albumUrl);
     	org.jsoup.nodes.Document doc;
 		try {
+			this.sleep(3000);
 			doc = Jsoup.connect(albumUrl).get();
 			this.setItemDetail(doc, al);
 			m.album = al;
 		} catch (IOException e) {
-			this.writeToFile("error/exception_" + fileID, "[" + songID + "] " + e.getMessage() + "\n", true);
+			this.writeToFile("error/exception_" + fileID, "[" + songID + "] setMusicAlbum: " + e.getMessage() + "\n", true);
             
 			System.out.println("Error in setMusicAlbum");
 			e.printStackTrace();
@@ -317,7 +392,7 @@ public class MusicLookup {
         Boolean found = false;
         /* The helper can sign requests in two forms - map form and string form */
         //String fileID = "ASINforDetails_0922";
-        String fileID = "song_1001";
+        String fileID = "sample2";
         Long timeStamp = System.currentTimeMillis();
         boolean hasASIN = false;
         
@@ -325,9 +400,10 @@ public class MusicLookup {
         String searchIndex = "MP3Downloads";
         //String searchIndex = "both";
         String fileName = "data/"+fileID+".csv";
-        String hitFile = "data/result/"+fileID+"_asin_"+searchIndex+timeStamp+".csv";
-        String missFile = "data/result/"+fileID+"_miss_"+searchIndex+timeStamp+".csv";
-        String albumFile = "data/result"+fileID+"_album_"+searchIndex+timeStamp+".csv";
+        String asinFile = "result/"+fileID+"_set_"+searchIndex+"_" + timeStamp+".csv";
+        String hitFile = "result/"+fileID+"_asin_"+searchIndex+"_" + timeStamp+".csv";
+        String missFile = "result/"+fileID+"_miss_"+searchIndex+"_" + timeStamp+".csv";
+        String albumFile = "result/"+fileID+"_album_"+searchIndex+"_" + timeStamp+".csv";
         //String simFile = "data/"+fileID+"_sim_"+searchIndex+".csv";
         MusicLookup ml = new MusicLookup();
         ml.fileID = fileID;
@@ -357,6 +433,48 @@ public class MusicLookup {
         ml.writeToFile(hitFile, "key"+Utils.split+ Music.getMusicHeader() + Utils.split + "sim1"+Utils.split+"sim2"+Utils.split+"sim3"+Utils.split+"requestUrl\n" + sbFound.toString(), true);
         ml.writeToFile(albumFile, "key"+Utils.split+"fileid"+Utils.split + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
         ml.writeToFile(missFile, Music.getMusicHeader() + "requestUrl\n" + sbMiss.toString(), true);
+        /*
+        // search for asin
+        for(int i = start; i < stop; i++){
+        	//System.out.println(ml.musicList.get(i).toString());
+        	Music music = ml.musicList.get(i);
+        	
+        	// search by song name and artist
+        	params.put("Keywords", music.song + " " + music.artist);
+        	//params.put("Keywords", music.song);
+            
+        	// Try on "MP3Downloads" index
+            params.put("SearchIndex", searchIndex);
+            requestUrl = helper.sign(params);
+            System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+            ml.songID = i;
+            found = ml.fetchISBN(requestUrl, music);
+            
+            if(found){
+            	hit++;
+            	float sim1 = 0;//nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
+            	float sim2 = 0;//levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
+            	float sim3 = 0;//jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
+            	if(music.totalReviews > 0){
+            		System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
+            	}
+            	
+            	ml.writeToFile(asinFile, music.ASIN + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + Utils.split + requestUrl + "\n", true);
+            	
+            } else{
+            	ml.writeToFile(missFile, music.toString() + Utils.split + requestUrl + "\n", true);
+            	miss++;
+            }
+            try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+				continue;
+			}
+        }
+        
+        System.exit(0);
+        */
         if(!hasASIN){
         	for(int i = start; i < stop; i++){
             	//System.out.println(ml.musicList.get(i).toString());
@@ -364,6 +482,7 @@ public class MusicLookup {
             	
             	// search by song name and artist
             	params.put("Keywords", music.song + " " + music.artist);
+            	//params.put("Keywords", music.song);
                 
             	// Try on "MP3Downloads" index
                 params.put("SearchIndex", searchIndex);
@@ -381,7 +500,8 @@ public class MusicLookup {
                 		System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
                 	}
                 	
-                	ml.writeToFile(hitFile, music.ASIN + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + Utils.split + requestUrl + "\n", true);
+                	ml.writeToFile(hitFile, music.ASIN + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + 
+                			Utils.split + requestUrl + "\n", true);
                 	if(music.album != null)
                 		ml.writeToFile(albumFile, music.ASIN + Utils.split + music.fileid + Utils.split + music.album.toString() + "\n", true);
                 	
@@ -390,7 +510,7 @@ public class MusicLookup {
                 	miss++;
                 }
                 try {
-    				Thread.sleep(800);
+    				Thread.sleep(1000);
     			} catch (InterruptedException e) {
     				e.printStackTrace();
     				continue;
@@ -408,7 +528,7 @@ public class MusicLookup {
             	// Try on "MP3Downloads" index
                 params.put("SearchIndex", searchIndex);
                 requestUrl = helper.sign(params);
-                System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+                System.out.println("["+i+"] ASIN: "+ music.ASIN +" \nSigned Request is \"" + requestUrl + "\"");
                 ml.songID = i;
                 found = ml.fetchItem( requestUrl, music);
                 
@@ -420,7 +540,8 @@ public class MusicLookup {
                 	if(music.totalReviews > 0){
                 		System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
                 	}
-                	ml.writeToFile(hitFile, key + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + Utils.split + requestUrl + "\n", true);
+                	ml.writeToFile(hitFile, key + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + 
+                			Utils.split + requestUrl + "\n", true);
                 	if(music.album != null)
                 		ml.writeToFile(albumFile, key + Utils.split + music.fileid + Utils.split + music.album.toString() + "\n", true);
                 	
@@ -428,7 +549,7 @@ public class MusicLookup {
                 	ml.writeToFile(missFile, music.toString() + Utils.split + requestUrl + "\n", true);
                 	miss++;
                 }try {
-    				Thread.sleep(800);
+    				Thread.sleep(1000);
     			} catch (InterruptedException e) {
     				System.out.println("Interrupt ----------------------------------------------");
     				e.printStackTrace();
