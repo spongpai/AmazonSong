@@ -116,6 +116,7 @@ public class MusicLookup {
 	    		if(token.length != 5){
 	    			writeToFile(file + "error", "["+token.length+"]" + line + "\n", true);
 	    		} else {
+	    			writeToFile(file + "correct", "["+token.length+"]" + line + "\n", true);
 		    		int id = Integer.parseInt(token[0]);
 		    		Music temp = new Music(id, token[1], token[2], token[3], token[4]);
 		    		musicList.add(temp);
@@ -127,6 +128,34 @@ public class MusicLookup {
 	    	e.printStackTrace();
 	    } 
 	}
+	public void getMusicFromFileWithSSN(String file){
+		String line = null;
+	    BufferedReader br = null;
+	    try{
+	    	br = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+	    	line = br.readLine(); 	// skip the header
+	    	//ssnumber|songid|post_title|song_artist|song_title
+
+	    	while ((line = br.readLine()) != null) {
+	    		String[] token = line.split("\\|", -1);
+	    		//System.out.println(line + "\n---- ["+token.length+"]");
+	    		if(token.length != 5){
+	    			writeToFile(file + "error", "["+token.length+"]" + line + "\n", true);
+	    		} else {
+	    			writeToFile(file + "correct", "["+token.length+"]" + line + "\n", true);
+		    		int id = Integer.parseInt(token[1]);
+		    		Music temp = new Music(id, "", token[2], token[3], token[4]);
+		    		temp.setSSNumber(token[0]);
+		    		musicList.add(temp);
+	    		}
+      		}
+	    	br.close();
+	    	br = null;
+	    } catch (Exception e){
+	    	e.printStackTrace();
+	    } 
+	}
+	
 	public void writeToFile(String file, String text, boolean append){
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(file, append));
@@ -239,29 +268,38 @@ public class MusicLookup {
     	org.jsoup.nodes.Document doc;
 		try {
 			this.sleep(3000);
-			doc = Jsoup.connect(productUrl).get();
+			doc = Jsoup.connect(productUrl).timeout(30000).userAgent("Mozilla/17.0").get();
     		setItemDetail(doc, music);
     		
     		// get artist name
     		Element eArtist = doc.getElementById("artist_row");
-    		String artistName = eArtist.text();
-    		music.amzArtist = artistName;
+    		if(eArtist != null){
+    			music.amzArtist = eArtist.text();
+    		} else{
+    			music.amzArtist = "";
+    		}
     		
     		
     		// get song title
     		Element eTitle = doc.getElementById("title_row");
-    		String title = eTitle.text();
-    		music.amzSongTitle = title;
+    		if(eTitle != null){
+    			music.amzSongTitle = eTitle.text();
+    		} else{
+    			music.amzSongTitle = "";
+    		}
+    		
     		
     		// get album
     		Element fromAlbum = doc.getElementById("fromAlbum");
-    		Element album = fromAlbum.select("a").first();
-    		String albumName = album.text();
-    		String albumUrl = album.attr("href");
-    		if(albumUrl != null){
-    			this.sleep(3000);
-    			this.setAlbumURL(albumUrl);
-    			setMusicAlbum(artistName, albumName, albumUrl, music);
+    		if(fromAlbum != null){
+	    		Element album = fromAlbum.select("a").first();
+	    		String albumName = album.text();
+	    		String albumUrl = album.attr("href");
+	    		if(albumUrl != null){
+	    			this.sleep(3000);
+	    			this.setAlbumURL(albumUrl);
+	    			setMusicAlbum(music.amzArtist, albumName, albumUrl, music);
+	    		}
     		}
     		
     	} catch (Exception e){
@@ -278,7 +316,7 @@ public class MusicLookup {
 		//pageUrl|duration|label|genre|sale_rank
 		Element list = product.select("ul").first();
 		Iterator<Element> ite = list.select("li").iterator();
-		
+		//System.out.println("+++++\n" + doc.toString());
 		// set label, duration, genre, and sale_rank
 		while(ite.hasNext()){
 			Element e = ite.next();
@@ -291,6 +329,7 @@ public class MusicLookup {
 				p.duration = text.substring("Duration: ".length());
 			} else if(text.contains("Amazon Best Sellers Rank: ")){
 				p.saleRank =  text.substring("Amazon Best Sellers Rank: ".length(), text.indexOf("("));
+				System.out.println("saleRank *************" + p.saleRank);
 			} else if(text.contains("Genres: ")){
 				String genres = "";
 				Element gList = e.select("ul").first();
@@ -324,6 +363,9 @@ public class MusicLookup {
 			}
 			p.disReviews = disRate.clone();
 			p.totalReviews = totalReviews;
+			
+			System.out.println("reviews ********* " + p.totalReviews + "|||" + p.disReviews[0] + ","
+					+ p.disReviews[1] + ","+ p.disReviews[2] + ","+ p.disReviews[3] + ","+ p.disReviews[4] + ",");
 		}
     }
     
@@ -332,7 +374,7 @@ public class MusicLookup {
     	org.jsoup.nodes.Document doc;
 		try {
 			this.sleep(3000);
-			doc = Jsoup.connect(albumUrl).get();
+			doc = Jsoup.connect(albumUrl).timeout(30000).userAgent("Mozilla/17.0").get();
 			this.setItemDetail(doc, al);
 			m.album = al;
 		} catch (IOException e) {
@@ -392,9 +434,9 @@ public class MusicLookup {
         Boolean found = false;
         /* The helper can sign requests in two forms - map form and string form */
         //String fileID = "ASINforDetails_0922";
-        String fileID = "sample2";
+        String fileID = "complete";
         Long timeStamp = System.currentTimeMillis();
-        boolean hasASIN = false;
+        int format = 2; // 0 = Normal (5 fields), 1 = ASIN (7 fields), 2 = SSN (5 fields)
         
         //String searchIndex = "Music";
         String searchIndex = "MP3Downloads";
@@ -407,16 +449,22 @@ public class MusicLookup {
         //String simFile = "data/"+fileID+"_sim_"+searchIndex+".csv";
         MusicLookup ml = new MusicLookup();
         ml.fileID = fileID;
-        if(!hasASIN){
+        
+        if(format == 0){
         	ml.getMusicFromFile(fileName);		// NO ASIN in the file yet
-        } else{
+        } else if(format == 1){
         	ml.getASINFromFile(fileName);		// ASIN is already included in the file
+        } else if(format == 2){
+        	ml.getMusicFromFileWithSSN(fileName);		// SSNumber is included in the file
+        } else{
+        	System.out.println("incorrect format....\nEXIT... BYE");
+        	System.exit(-1);
         }
         
         int hit = 0;
         int miss = 0;
-        int start = 0;
-        int stop = ml.musicList.size();
+        int start = 1058;
+        int stop = 1499;//ml.musicList.size();
         System.out.println(start + ",  " + stop);
         NGramDistance nGram  = new NGramDistance();
         LevensteinDistance levenstein = new LevensteinDistance();
@@ -430,9 +478,17 @@ public class MusicLookup {
         StringBuilder sbMiss = new StringBuilder();
         StringBuilder sbAlbum = new StringBuilder();
         // Write header of the output files
-        ml.writeToFile(hitFile, "key"+Utils.split+ Music.getMusicHeader() + Utils.split + "sim1"+Utils.split+"sim2"+Utils.split+"sim3"+Utils.split+"requestUrl\n" + sbFound.toString(), true);
-        ml.writeToFile(albumFile, "key"+Utils.split+"fileid"+Utils.split + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
-        ml.writeToFile(missFile, Music.getMusicHeader() + "requestUrl\n" + sbMiss.toString(), true);
+        if(format == 2){
+        	ml.writeToFile(hitFile, "SSNumber"+Utils.split+"key"+Utils.split+ Music.getMusicHeader() + Utils.split + "sim1"+Utils.split+"sim2"+Utils.split+"sim3"+Utils.split+"requestUrl\n" + sbFound.toString(), true);
+            ml.writeToFile(albumFile, "SSNumber"+Utils.split+"key"+Utils.split+"fileid"+Utils.split + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
+            ml.writeToFile(missFile, "SSNumber"+Utils.split+Music.getMusicHeader() + Utils.split + "requestUrl\n" + sbMiss.toString(), true);
+            
+        } else{
+        	ml.writeToFile(hitFile, "key"+Utils.split+ Music.getMusicHeader() + Utils.split + "sim1"+Utils.split+"sim2"+Utils.split+"sim3"+Utils.split+"requestUrl\n" + sbFound.toString(), true);
+            ml.writeToFile(albumFile, "key"+Utils.split+"fileid"+Utils.split + Album.getAlbumHeader() + "\n" + sbAlbum.toString(), true);
+            ml.writeToFile(missFile, Music.getMusicHeader() + Utils.split + "requestUrl\n" + sbMiss.toString(), true);
+            
+        }
         /*
         // search for asin
         for(int i = start; i < stop; i++){
@@ -475,7 +531,7 @@ public class MusicLookup {
         
         System.exit(0);
         */
-        if(!hasASIN){
+        if(format == 0){
         	for(int i = start; i < stop; i++){
             	//System.out.println(ml.musicList.get(i).toString());
             	Music music = ml.musicList.get(i);
@@ -493,6 +549,7 @@ public class MusicLookup {
                 
                 if(found){
                 	hit++;
+                	System.out.println(music.detailPage);
                 	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
                 	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
                 	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
@@ -516,7 +573,7 @@ public class MusicLookup {
     				continue;
     			}
             }
-        } else{
+        } else if (format == 1){
         	for(int i = start; i < stop; i++){
             	//System.out.println(ml.musicList.get(i).toString());
             	Music music = ml.musicList.get(i);
@@ -534,6 +591,7 @@ public class MusicLookup {
                 
                 if(found){
                 	hit++;
+                	System.out.println(music.detailPage);
                 	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
                 	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
                 	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
@@ -552,6 +610,48 @@ public class MusicLookup {
     				Thread.sleep(1000);
     			} catch (InterruptedException e) {
     				System.out.println("Interrupt ----------------------------------------------");
+    				e.printStackTrace();
+    				continue;
+    			}
+            }
+        } else if(format == 2){
+        	for(int i = start; i < stop; i++){
+            	//System.out.println(ml.musicList.get(i).toString());
+            	Music music = ml.musicList.get(i);
+            	
+            	// search by song name and artist
+            	params.put("Keywords", music.song + " " + music.artist);
+            	//params.put("Keywords", music.song);
+                
+            	// Try on "MP3Downloads" index
+                params.put("SearchIndex", searchIndex);
+                requestUrl = helper.sign(params);
+                System.out.println("["+i+"] Signed Request is \"" + requestUrl + "\"");
+                ml.songID = i;
+                found = ml.fetchItem(requestUrl, music);
+                
+                if(found){
+                	hit++;
+                	System.out.println(music.detailPage);
+                	float sim1 = nGram.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim2 = levenstein.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	float sim3 = jaroWinkler.getDistance(music.song, music.amzItemAttributes.get("Title"));
+                	//if(music.totalReviews > 0){
+                	//	System.out.println("----- found reviews -----" + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3);
+                	//}
+                	
+                	ml.writeToFile(hitFile, music.ssnumber + Utils.split + music.ASIN + Utils.split + music.toString() + Utils.split + sim1 + Utils.split + sim2 + Utils.split + sim3 + 
+                			Utils.split + requestUrl + "\n", true);
+                	if(music.album != null)
+                		ml.writeToFile(albumFile, music.ssnumber + Utils.split + music.ASIN +  Utils.split + music.fileid + Utils.split + music.album.toString() + "\n", true);
+                	
+                } else{
+                	ml.writeToFile(missFile, music.ssnumber + Utils.split + music.toString() + Utils.split + requestUrl + "\n", true);
+                	miss++;
+                }
+                try {
+    				Thread.sleep(1000);
+    			} catch (InterruptedException e) {
     				e.printStackTrace();
     				continue;
     			}

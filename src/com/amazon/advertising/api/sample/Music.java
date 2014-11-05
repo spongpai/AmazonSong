@@ -20,6 +20,8 @@ public class Music extends Product {
 	
 	public String amzArtist, amzSongTitle;
 	public Album album;
+	public String ssnumber;
+	
 	public Music(){
 		
 	}
@@ -35,6 +37,9 @@ public class Music extends Product {
 		this.totalReviews = 0;
 	}
 	
+	public void setSSNumber(String ss){
+		this.ssnumber = ss;
+	}
 	public void setASIN(String asin){
 		this.ASIN = asin;
 	}
